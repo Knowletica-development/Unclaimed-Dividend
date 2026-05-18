@@ -1,0 +1,45 @@
+name: CI/CD Deploy to Ubuntu Server
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      # Step 1: Checkout code (optional if only using Docker images)
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      # Step 2: Deploy to Ubuntu Server via SSH
+      - name: Deploy to Ubuntu Server
+        uses: appleboy/ssh-action@v1.0.3
+
+        with:
+          host: ${{ secrets.LINUX_HOST }}
+          username: ${{ secrets.LINUX_USERNAME }}
+          key: ${{ secrets.LINUX_SSH_KEY }}
+
+          script: |
+
+            docker stop frontend-container || true
+            docker rm frontend-container || true
+
+            docker stop backend-container || true
+            docker rm backend-container || true
+            
+            docker pull ramya019/unclaimeddividend-frontend:latest
+            docker pull ramya019/unclaimeddividend-backend:latest
+
+            docker run -d \
+              --name frontend-container \
+              -p 5173:5173 \
+              ramya019/unclaimeddividend-frontend:latest
+
+            docker run -d \
+              --name backend-container \
+              -p 8000:8000 \
+              ramya019/unclaimeddividend-backend:latest
