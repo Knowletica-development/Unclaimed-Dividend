@@ -3,6 +3,8 @@ import React, { useState } from "react";
 export default function ContactPage() {
   const [formState, setFormState] = useState({ name: "", email: "", message: "" });
 
+  console.log(formState)
+
   const handleSubmit = (e) => {
     e.preventDefault();
     console.log("Transmission Data Securely Logged:", formState);
