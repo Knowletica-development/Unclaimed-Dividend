@@ -68,6 +68,7 @@ const Home = () => {
   const [debouncedSearch, setDebouncedSearch] = useState(search);
 
   const dispatch = useDispatch();
+  console.log(dispatch)
 
   useEffect(() => {
     const timer = setTimeout(() => {
