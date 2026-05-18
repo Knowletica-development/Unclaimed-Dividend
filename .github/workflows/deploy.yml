@@ -3,7 +3,7 @@ name: Production Deployment Pipeline
 on:
   push:
     branches:
-      - main 
+      - main
 
 jobs:
   deploy:
@@ -15,49 +15,48 @@ jobs:
 
       - name: Setup SSH Context & Deploy
         run: |
-          # 1. GitHub runner ke andar ssh space ready karna
           mkdir -p ~/.ssh
-          
-          # 2. Private Key inject karna (Password free login ke liye)
           echo "${{ secrets.SERVER_SSH_KEY }}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
-          
-          # 3. Server IP ko known_hosts me add karna taaki fingerprint prompt na aaye
           ssh-keyscan -H 93.127.206.102 >> ~/.ssh/known_hosts
 
-          # 4. DIRECT SSH CONNECTION AS ROOT (Single Line Core Logic)
+          # CONNECTING AS ROOT
           ssh -i ~/.ssh/id_rsa root@93.127.206.102 "
             echo 'Connected as root. Initiating deployment...'
             
-            # Project folder me jaana (Is path ko apne server ke folder path se match kar lena)
-            cd /var/www/your-project-folder || exit
+            # 1️⃣ STEP: Teri asli repo root folder (/root/Unclaimed-Dividend) me jana
+            cd /root/Unclaimed-Dividend || exit
 
-            echo 'Step 1: Fetching latest code from GitHub...'
+            echo '📥 Step 1: Fetching latest code from GitHub...'
             git fetch --all
             git reset --hard origin/main
 
-            echo 'Step 2: Injecting Runtime Secrets...'
-            echo '${{ secrets.PROD_ENV_FILE }}' > backend/.env
-
-            echo ' Step 3: Frontend Dependency Build...'
+            echo 'Step 3: Frontend Dependency & Build Generation...'
             cd frontend
             npm ci
             npm run build
             
-            echo 'Step 4: Swapping Build Files to Nginx Root...'
-            # Purani build clean karke nayi copy karna (Kyunki root ho, sudo ki need nahi hai)
-            rm -rf /var/www/html/*
-            cp -r build/* /var/www/html/
+            echo 'Step 4: Moving Dist/Build folder to Nginx Web Root...'
+            mkdir -p /var/www/unclaimed
+            rm -rf /var/www/unclaimed/*
+            
+            if [ -d \"dist\" ]; then
+              cp -r dist/* /var/www/unclaimed/
+              echo 'Vite dist folder copied to /var/www/unclaimed'
+            elif [ -d \"build\" ]; then
+              cp -r build/* /var/www/unclaimed/
+              echo 'React build folder copied to /var/www/unclaimed'
+            fi
             
             echo 'Step 5: Backend Dependency Update...'
             cd ../backend
             npm ci --production
             
-            echo 'Step 6: Reloading PM2 Micro-services...'
-            pm2 reload all || pm2 start server.js --name 'dividend-backend'
+            echo 'Step 6: Reloading PM2 Cluster/Process...'
+            pm2 restart all
 
-            echo 'Step 7: Nginx Configuration Reload...'
+            echo 'Step 7: Nginx Configuration Validation & Reload...'
             nginx -t && systemctl reload nginx
 
-            echo 'Deployment Complete!'
+            echo 'Deployment Complete & Live on Nginx!'
           "
