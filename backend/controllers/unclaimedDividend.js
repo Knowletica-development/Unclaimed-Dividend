@@ -262,7 +262,20 @@ export const getMyUnclaimedDividends = CatchAsyncError(
 
     const query = { submittedBy: userId };
 
-    const [claims, total] = await Promise.all([
+    if (req.query.search) {
+      const searchRegex = new RegExp(req.query.search.trim(), "i");
+      query["Investor Name"] = { $regex: searchRegex };
+    }
+
+    if (req.query.pincode) {
+      query["Pincode"] = Number(req.query.pincode);
+    }
+
+    if (req.query.company) {
+      query["Company Name"] = { $regex: new RegExp(req.query.company.trim(), "i") };
+    }
+
+    const [claims, total, analytics] = await Promise.all([
       UnclaimedDividend.find(query)
         .sort({ createdAt: -1 })
         .skip(skip)
@@ -270,19 +283,43 @@ export const getMyUnclaimedDividends = CatchAsyncError(
         .lean(),
 
       UnclaimedDividend.countDocuments(query),
+
+      UnclaimedDividend.aggregate([
+        { $match: query },
+        {
+          $group: {
+            _id: null,
+            totalUnclaimedAmount: { $sum: { $ifNull: ["$Amount", 0] } },
+            totalSharesTracked: { $sum: { $ifNull: ["$No. Of Shares", 0] } },
+            totalEstimatedValue: { $sum: { $ifNull: ["$Value", 0] } },
+            uniqueCompanies: { $addToSet: "$Company Name" }
+          }
+        }
+      ])
     ]);
 
-    if (!claims.length) {
-      return next(new ErrorHandler("No unclaimed dividend records found", 404));
-    }
+    const summary = analytics[0] ? {
+      totalUnclaimedAmount: Number(analytics[0].totalUnclaimedAmount.toFixed(2)),
+      totalSharesTracked: analytics[0].totalSharesTracked,
+      totalEstimatedValue: Number(analytics[0].totalEstimatedValue.toFixed(2)),
+      totalUniqueCompanies: analytics[0].uniqueCompanies.length
+    } : {
+      totalUnclaimedAmount: 0,
+      totalSharesTracked: 0,
+      totalEstimatedValue: 0,
+      totalUniqueCompanies: 0
+    };
 
     res.status(200).json({
       success: true,
-      totalRecords: total,
-      page,
-      limit,
-      totalPages: Math.ceil(total / limit),
-      data: claims,
+      meta: {
+        totalRecords: total,
+        currentPage: page,
+        limit,
+        totalPages: Math.ceil(total / limit),
+        analyticsSummary: summary 
+      },
+      data: claims 
     });
   }
 );

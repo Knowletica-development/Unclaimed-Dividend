@@ -516,7 +516,7 @@ export const getCurrentUser = CatchAsyncError(async (req, res, next) => {
 
 export const getDividends = (req, res) => {
   try {
-    let data = getDividendData();
+    let data = getDividendData(); 
     if (!data || data.length === 0) {
       return res.status(404).json({
         success: false,
@@ -526,20 +526,31 @@ export const getDividends = (req, res) => {
 
     const page = Math.max(parseInt(req.query.page) || 1, 1);
     const limit = Math.min(parseInt(req.query.limit) || 100, 1000);
-    const search = req.query.search?.toLowerCase() || "";
+    const search = req.query.search?.trim().toLowerCase() || "";
+    const pincode = req.query.pincode?.trim() || "";
+    const company = req.query.company?.trim().toLowerCase() || "";
     const sortField = req.query.sort || null;
     const sortOrder = req.query.order === "desc" ? "desc" : "asc";
 
-    if (search) {
-      const searchText = search.trim();
+    if (search || pincode || company) {
+      data = data.filter((row) => {
+        const matchSearch = search 
+          ? (row["Investor Name"] && String(row["Investor Name"]).toLowerCase().includes(search))
+          : true;
 
-      data = data.filter(
-        (row) =>
-          row["Investor Name"] &&
-          row["Investor Name"].toLowerCase().includes(searchText)
-      );
+        const matchPincode = pincode 
+          ? (row["Pincode"] && String(row["Pincode"]).trim().startsWith(pincode.trim()))
+          : true;
+
+        const matchCompany = company 
+          ? (row["Company Name"] && String(row["Company Name"]).toLowerCase().includes(company))
+          : true;
+
+        return matchSearch && matchPincode && matchCompany;
+      });
     }
 
+    // 2. Sorting Phase
     if (sortField) {
       data.sort((a, b) => {
         const valA = a[sortField] ?? "";
@@ -555,20 +566,86 @@ export const getDividends = (req, res) => {
       });
     }
 
+    // 3. Analytics Summary (Over the filtered dataset)
+    const uniqueCompaniesSet = new Set();
+    let totalClaimedCount = 0;
+    let totalUnclaimedCount = 0;
+    
+    const analyticsSummary = data.reduce(
+      (acc, row) => {
+        const amount = Number(row["Amount"]) || 0;
+        const shares = Number(row["No. Of Shares"]) || 0;
+        const value = Number(row["Value"]) || 0;
+        
+        if (row["Company Name"]) {
+          uniqueCompaniesSet.add(String(row["Company Name"]).trim());
+        }
+
+        acc.totalUnclaimedAmount += amount;
+        acc.totalSharesTracked += shares;
+        acc.totalEstimatedValue += value;
+
+        // Status counting logic (Matching our formula below)
+        if (amount > 50) {
+          totalUnclaimedCount++;
+        } else {
+          totalClaimedCount++;
+        }
+        
+        return acc;
+      },
+      { totalUnclaimedAmount: 0, totalSharesTracked: 0, totalEstimatedValue: 0 }
+    );
+
+    analyticsSummary.totalUnclaimedAmount = Number(analyticsSummary.totalUnclaimedAmount.toFixed(2));
+    analyticsSummary.totalEstimatedValue = Number(analyticsSummary.totalEstimatedValue.toFixed(2));
+    analyticsSummary.totalUniqueCompanies = uniqueCompaniesSet.size;
+    analyticsSummary.globalClaimedRecords = totalClaimedCount;
+    analyticsSummary.globalUnclaimedRecords = totalUnclaimedCount;
+
+    // 4. Pagination Phase
     const total = data.length;
     const startIndex = (page - 1) * limit;
     const endIndex = Math.min(startIndex + limit, total);
-
     const paginatedData = data.slice(startIndex, endIndex);
 
+    // 5. THE MAGIC: Row-Level Calculations & Status Mapping ✨
+    // Frontend par har card ko ye computed data milega
+    const enhancedData = paginatedData.map((row) => {
+      const currentPrice = Number(row["Current Share Price"]) || 0;
+      const dividendDeclared = Number(row["Dividend Declared"]) || 0;
+      const amount = Number(row["Amount"]) || 0;
+
+      // Formula A: Dividend Yield % Calculation
+      const dividendYield = currentPrice > 0 
+        ? Number(((dividendDeclared / currentPrice) * 100).toFixed(2)) 
+        : 0;
+
+      // Formula B: Dynamic Claim Status Logic
+      // Rule: Agar amount ₹50 se bada hai, toh government IEPF account mein fasa hai (Unclaimed).
+      // Agar bohot chota ya negligible amount hai, toh it might be processed/settled already (Claimed).
+      const claimStatus = amount > 50 ? "Unclaimed" : "Claimed/Settled";
+
+      return {
+        ...row,
+        "Dividend Yield %": dividendYield, // New Calculated Field
+        "Claim Status": claimStatus,       // New Status Field
+      };
+    });
+
+    // 6. Response
     res.status(200).json({
       success: true,
-      totalRecords: total,
-      page,
-      limit,
-      totalPages: Math.ceil(total / limit),
-      data: paginatedData,
+      meta: {
+        totalRecords: total,
+        currentPage: page,
+        limit,
+        totalPages: Math.ceil(total / limit),
+        analyticsSummary: analyticsSummary 
+      },
+      data: enhancedData, 
     });
+
   } catch (error) {
     console.error("Error fetching dividend data:", error);
     res.status(500).json({

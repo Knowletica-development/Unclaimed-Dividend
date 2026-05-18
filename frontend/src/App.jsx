@@ -6,6 +6,8 @@ import Login from "./pages/Auth/Login";
 import Home from "./pages/Home/Home";
 import ProfilePage from "./pages/profile/ProfilePage";
 import Dashboard from "./pages/Dashboard/Dashboard";
+import About from "./pages/About/About";
+import ContactPage from "./pages/contact/ContactPage";
 
 function App() {
   return (
@@ -13,6 +15,8 @@ function App() {
       <Navbar />
       <Routes>
         <Route path="/" element={<Home />} />
+        <Route path="/about" element={<About />} />
+        <Route path="/contact" element={<ContactPage />} />
         <Route path="/profile" element={<ProfilePage />} />
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/register" element={<Signup />} />
