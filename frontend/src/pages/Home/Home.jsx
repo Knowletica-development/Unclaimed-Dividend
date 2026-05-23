@@ -3,6 +3,7 @@ import axiosInstance from "../../utils/axiosInstance";
 import { useDispatch } from "react-redux";
 import { fetchCurrentUser } from "../../redux/userSlice";
 import DividendMap from "./DividendMap";
+import CawasjiData from "./CawasjiData";
 
 const STATE_TO_PREFIX_MAP = {
   DELHI: "11",
@@ -146,6 +147,7 @@ const Home = () => {
   };
 
   return (
+   <>
     <div className="min-h-screen bg-slate-50/50 pb-16">
       <div className="bg-gradient-to-r from-blue-700 via-indigo-800 to-slate-900 text-white py-12 px-6 md:px-16 text-center shadow-md">
         <h1 className="text-3xl md:text-5xl font-extrabold tracking-tight mb-3">
@@ -430,6 +432,8 @@ const Home = () => {
         )}
       </div>
     </div>
+    <CawasjiData/>
+   </>
   );
 };
 

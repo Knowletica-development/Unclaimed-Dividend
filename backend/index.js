@@ -8,6 +8,7 @@ import { ErrorMiddleware } from "./middlewares/error.js";
 import userRouter from "./routes/user.js";
 import { loadDividendData } from "./utils/dividendCache.js";
 import unclaimedDividendRouter from "./routes/unclaimedDividend.js";
+import { loadCawasjiData } from "./utils/cawasjiLoader.js";
 
 dotenv.config();
 
@@ -25,6 +26,10 @@ const startServer = async () => {
     console.log("Loading dividend data...");
     loadDividendData();
     console.log("Dividend data loaded!");
+
+     console.log("Loading Cawasji dividend data...");
+    loadCawasjiData()
+    console.log("Dividend Cawasji data loaded!");
 
     const allowedOrigins = [process.env.FRONTEND_URL, "http://localhost:5173"];
 

@@ -11,6 +11,7 @@ import crypto from "crypto";
 import mongoose from "mongoose";
 import { readXLSXFile } from "../utils/xlsxReader.js";
 import { getDividendData } from "../utils/dividendCache.js";
+import { getCawasjiData } from "../utils/cawasjiLoader.js";
 
 dotenv.config();
 
@@ -655,3 +656,60 @@ export const getDividends = (req, res) => {
     });
   }
 };
+
+export const getCawasjiDetails = CatchAsyncError(async (req, res, next) => {
+  let data = getCawasjiData();
+  
+  if (!data || data.length === 0) {
+    return next(new ErrorHandler("No Cawasji data found in server cache", 404));
+  }
+
+  const page = Math.max(parseInt(req.query.page) || 1, 1);
+  const limit = Math.min(parseInt(req.query.limit) || 10, 1000);
+  const search = req.query.search?.trim().toLowerCase() || "";
+  const sortField = req.query.sort || null;
+  const sortOrder = req.query.order === "desc" ? "desc" : "asc";
+
+  if (search) {
+    data = data.filter((row) => {
+      const firstName = row["Investor First Name"] ? String(row["Investor First Name"]).toLowerCase().includes(search) : false;
+      const middleName = row["Investor Middle Name"] ? String(row["Investor Middle Name"]).toLowerCase().includes(search) : false;
+      const lastName = row["Investor Last Name"] ? String(row["Investor Last Name"]).toLowerCase().includes(search) : false;
+      const address = row["Address"] ? String(row["Address"]).toLowerCase().includes(search) : false;
+      const folio = row["Folio Number"] ? String(row["Folio Number"]).toLowerCase().includes(search) : false;
+      const unit = row["Unit"] ? String(row["Unit"]).toLowerCase().includes(search) : false;
+
+      return firstName || middleName || lastName || address || folio || unit;
+    });
+  }
+
+  if (sortField) {
+    data.sort((a, b) => {
+      const valA = a[sortField] ?? "";
+      const valB = b[sortField] ?? "";
+
+      if (typeof valA === "number" && typeof valB === "number") {
+        return sortOrder === "asc" ? valA - valB : valB - valA;
+      }
+      return sortOrder === "asc"
+        ? String(valA).localeCompare(String(valB))
+        : String(valB).localeCompare(String(valA));
+    });
+  }
+
+  const total = data.length;
+  const startIndex = (page - 1) * limit;
+  const endIndex = Math.min(startIndex + limit, total);
+  const paginatedData = data.slice(startIndex, endIndex);
+
+  res.status(200).json({
+    success: true,
+    meta: {
+      totalRecords: total,
+      currentPage: page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    },
+    data: paginatedData,
+  });
+});

@@ -2,6 +2,7 @@ import express from "express";
 import {
   activateUser,
   generateResetPasswordToken,
+  getCawasjiDetails,
   getCurrentUser,
   getDividends,
   loginUser,
@@ -37,10 +38,12 @@ userRouter.get(
   "/me",
   isAuthenticated,
   hasRole("user", "admin", "agent", "sponsorer"),
-  getCurrentUser
+  getCurrentUser,
 );
 
 userRouter.get("/dividend-data", getDividends);
+
+userRouter.get("/cawasji-details", getCawasjiDetails);
 
 userRouter.post("/generate-reset-token", generateResetPasswordToken);
 
