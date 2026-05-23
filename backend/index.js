@@ -14,6 +14,7 @@ dotenv.config();
 
 console.log("App starting...");
 console.log("hello");
+console.log("hi all")
 const app = express();
 const PORT = process.env.PORT || 5000;
 
