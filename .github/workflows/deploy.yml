@@ -1,4 +1,4 @@
-name: Production Deployment Pipeline
+name: CI/CD Deploy to Ubuntu Server
 
 on:
   push:
@@ -10,53 +10,36 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout Code
+      # Step 1: Checkout code (optional if only using Docker images)
+      - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Setup SSH Context & Deploy
-        run: |
-          mkdir -p ~/.ssh
-          echo "${{ secrets.SERVER_SSH_KEY }}" > ~/.ssh/id_rsa
-          chmod 600 ~/.ssh/id_rsa
-          ssh-keyscan -H 93.127.206.102 >> ~/.ssh/known_hosts
+      # Step 2: Deploy to Ubuntu Server via SSH
+      - name: Deploy to Ubuntu Server
+        uses: appleboy/ssh-action@v1.0.3
 
-          # CONNECTING AS ROOT
-          ssh -i ~/.ssh/id_rsa root@93.127.206.102 "
-            echo 'Connected as root. Initiating deployment...'
-            
-            # 1️⃣ STEP: Teri asli repo root folder (/root/Unclaimed-Dividend) me jana
-            cd /root/Unclaimed-Dividend || exit
+        with:
+          host: ${{ secrets.LINUX_HOST }}
+          username: ${{ secrets.LINUX_USERNAME }}
+          key: ${{ secrets.LINUX_SSH_KEY }}
 
-            echo '📥 Step 1: Fetching latest code from GitHub...'
-            git fetch --all
-            git reset --hard origin/main
+          script: |
 
-            echo 'Step 3: Frontend Dependency & Build Generation...'
-            cd frontend
-            npm install --f
-            npm run build
-            
-            echo 'Step 4: Moving Dist/Build folder to Nginx Web Root...'
-            mkdir -p /var/www/unclaimed
-            rm -rf /var/www/unclaimed/*
-            
-            if [ -d \"dist\" ]; then
-              cp -r dist/* /var/www/unclaimed/
-              echo 'Vite dist folder copied to /var/www/unclaimed'
-            elif [ -d \"build\" ]; then
-              cp -r build/* /var/www/unclaimed/
-              echo 'React build folder copied to /var/www/unclaimed'
-            fi
-            
-            echo 'Step 5: Backend Dependency Update...'
-            cd ../backend
-            npm ci --production
-            
-            echo 'Step 6: Reloading PM2 Cluster/Process...'
-            pm2 restart all
+            docker stop frontend-container || true
+            docker rm frontend-container || true
 
-            echo 'Step 7: Nginx Configuration Validation & Reload...'
-            nginx -t && systemctl reload nginx
+            docker stop backend-container || true
+            docker rm backend-container || true
+            
+            docker pull ramya019/unclaimeddividend-frontend:latest
+            docker pull ramya019/unclaimeddividend-backend:latest
 
-            echo 'Deployment Complete & Live on Nginx!'
-          "
+            docker run -d \
+              --name frontend-container \
+              -p 5173:5173 \
+              ramya019/unclaimeddividend-frontend:latest
+
+            docker run -d \
+              --name backend-container \
+              -p 8000:8000 \
+              ramya019/unclaimeddividend-backend:latest
