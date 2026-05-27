@@ -4,6 +4,7 @@ import { useDispatch } from "react-redux";
 import { fetchCurrentUser } from "../../redux/userSlice";
 import DividendMap from "./DividendMap";
 import CawasjiData from "./CawasjiData";
+import PDFList from "./PDFList";
 
 const STATE_TO_PREFIX_MAP = {
   DELHI: "11",
@@ -433,6 +434,7 @@ const Home = () => {
       </div>
     </div>
     <CawasjiData/>
+    <PDFList/>
    </>
   );
 };
